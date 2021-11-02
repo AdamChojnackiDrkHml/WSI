@@ -136,8 +136,16 @@ public class Solver
                 }
 
             }
-
-            byte[] head = Board.translate1Dto2D(currSolved);
+            byte lastTiled = 0;
+            for(int i = 0; i < board_content.length; i++)
+            {
+                if(board_content[i] == currSolved-1)
+                {
+                    lastTiled = (byte)i;
+                    break;
+                }
+            }
+            byte[] head = Board.translate1Dto2D(lastTiled);
             byte zeroPos = 0;
             for(int i = 0; i < board_content.length; i++)
             {
