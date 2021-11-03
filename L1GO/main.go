@@ -8,9 +8,10 @@ import (
 )
 
 const BOARD_SIZE = 4
-const HEURISTIC = 0
 
-var solvable bool
+const shuffleshuffle = 30
+
+var HEURISTIC int
 var lastNode *Node
 
 type Node struct {
@@ -32,7 +33,7 @@ func node_heuristic(data [BOARD_SIZE * BOARD_SIZE]int8) int8 {
 	case 0:
 		return heuristic_manhattan(data)
 	case 1:
-		return heuristic_hamming(data)
+		return heuristic_hammingPlus(data)
 	}
 	return 0
 }
@@ -61,39 +62,10 @@ func heuristic_manhattan(data [BOARD_SIZE * BOARD_SIZE]int8) int8 {
 			}
 		}
 	}
-	// tiled := 0
-	// zeroPos := 0
-	// nextPos := 0
-	// for i, n := range data {
-	// 	if n == int8(i+1) {
-	// 		tiled++
-	// 	} else {
-	// 		break
-	// 	}
-	// }
-
-	// for i, n := range data {
-	// 	if n == 0 {
-	// 		zeroPos = i
-	// 		break
-	// 	}
-	// }
-
-	// for i, n := range data {
-	// 	if n == int8(tiled)+1 {
-	// 		nextPos = i
-	// 		break
-	// 	}
-	// }
-
-	// A, B := board_get2Dfrom1D(int8(zeroPos))
-	// Acor, Bcor := board_get2Dfrom1D(int8(nextPos))
-	// heur += 10 * Abs(A-Acor)
-	// heur += 10 * Abs(B-Bcor)
 	return heur
 }
 
-func heuristic_hamming(data [BOARD_SIZE * BOARD_SIZE]int8) int8 {
+func heuristic_hammingPlus(data [BOARD_SIZE * BOARD_SIZE]int8) int8 {
 	heur := int8(0)
 
 	for i, n := range data {
@@ -176,8 +148,7 @@ func (pq PriorityQueue) Len() int {
 }
 
 func (pq PriorityQueue) Less(i, j int) bool {
-	// We want Pop to give us the lowest based on expiration number as the priority
-	// The lower the expiry, the higher the priority
+
 	return pq[i].heuristic+pq[i].moves < pq[j].heuristic+pq[j].moves
 }
 
@@ -203,17 +174,22 @@ func (pq PriorityQueue) Swap(i int, j int) {
 	pq[j].Index = int8(j)
 }
 
-func Solver(board [BOARD_SIZE * BOARD_SIZE]int8) {
+func Solver(display bool, board [BOARD_SIZE * BOARD_SIZE]int8) {
 	if !isSolvable(board) {
 		fmt.Println("BAD")
 		return
 	}
+	added := 0
+	visited := make([]*Node, 0)
 	pq := &PriorityQueue{}
-
 	heap.Push(pq, node_new(board, 0, nil))
 
 	for {
 		removed := heap.Pop(pq).(*Node)
+
+		if !searchIfExists(visited, removed) {
+			visited = append(visited, removed)
+		}
 
 		if removed == nil {
 			break
@@ -221,7 +197,6 @@ func Solver(board [BOARD_SIZE * BOARD_SIZE]int8) {
 
 		if isSolved(removed.data) {
 			lastNode = removed
-			solvable = true
 			break
 		}
 
@@ -231,13 +206,27 @@ func Solver(board [BOARD_SIZE * BOARD_SIZE]int8) {
 			if removed.prevNode != nil && removed.prevNode.data == n {
 				continue
 			}
+			new_node := node_new(n, removed.moves+1, removed)
 
-			heap.Push(pq, node_new(n, removed.moves+1, removed))
+			heap.Push(pq, new_node)
+			added++
 		}
 	}
-	displaySolution()
+	if display {
+		displaySolution()
+	}
+	fmt.Println(len(visited), " ", getStepCount(), " ", added)
+	//fmt.Println("solved")
 }
 
+func searchIfExists(visited []*Node, node *Node) bool {
+	for _, n := range visited {
+		if node.data == n.data {
+			return true
+		}
+	}
+	return false
+}
 func getInvCount(board [BOARD_SIZE * BOARD_SIZE]int8) int {
 	inv_count := 0
 
@@ -282,6 +271,15 @@ func displaySolution() {
 		printBoard(node.data)
 		node = node.prevNode
 	}
+}
+
+func getStepCount() int {
+	node := lastNode
+	i := 0
+	for ; node != nil; i++ {
+		node = node.prevNode
+	}
+	return i
 }
 
 func printBoard(board [BOARD_SIZE * BOARD_SIZE]int8) {
@@ -383,22 +381,80 @@ func board_create() [BOARD_SIZE * BOARD_SIZE]int8 {
 		board[i] = int8(i + 1)
 	}
 	board[len(board)-1] = 0
-	rand.Seed(time.Now().UnixNano())
-	rand.Shuffle(len(board), func(i, j int) { board[i], board[j] = board[j], board[i] })
+	board = shuffle(board)
 
-	for i, n := range board {
+	//printBoard(board)
+	return board
+}
+
+func shuffle(board [BOARD_SIZE * BOARD_SIZE]int8) [BOARD_SIZE * BOARD_SIZE]int8 {
+	possible := [4]int{-1, -BOARD_SIZE, 1, BOARD_SIZE}
+	allowed := [4]int{1, 1, 1, 1}
+	previous := -1
+	var next int
+	rand.Seed(time.Now().UnixNano())
+	zeroCords := []int8{0, 0}
+	zeroPos := 0
+
+	for j, n := range board {
 		if n == 0 {
-			board[i], board[len(board)-1] = board[len(board)-1], board[i]
+			zeroCords[0], zeroCords[1] = board_get2Dfrom1D(int8(j))
+			zeroPos = j
 			break
 		}
 	}
-	printBoard(board)
+
+	for i := 0; i < shuffleshuffle; i++ {
+		if zeroCords[0] == 0 {
+			allowed[0] = 0
+		}
+
+		if zeroCords[0] == BOARD_SIZE-1 {
+			allowed[2] = 0
+		}
+
+		if zeroCords[1] == 0 {
+			allowed[1] = 0
+		}
+
+		if zeroCords[1] == BOARD_SIZE-1 {
+			allowed[3] = 0
+		}
+		next = rand.Intn(4)
+		for allowed[next] == 0 || next == previous {
+			next = rand.Intn(4)
+		}
+
+		board[zeroPos] = board[zeroPos] ^ board[zeroPos+possible[next]]
+		board[zeroPos+possible[next]] = board[zeroPos] ^ board[zeroPos+possible[next]]
+		board[zeroPos] = board[zeroPos] ^ board[zeroPos+possible[next]]
+		previous = (next + 2) % 4
+		zeroPos = zeroPos + possible[next]
+		zeroCords[0], zeroCords[1] = board_get2Dfrom1D(int8(zeroPos))
+		allowed = [4]int{1, 1, 1, 1}
+		// fmt.Println("debug")
+		// printBoard(board)
+	}
+
+	board[zeroPos] = board[zeroPos] ^ board[BOARD_SIZE*BOARD_SIZE-1]
+	board[BOARD_SIZE*BOARD_SIZE-1] = board[zeroPos] ^ board[BOARD_SIZE*BOARD_SIZE-1]
+	board[zeroPos] = board[zeroPos] ^ board[BOARD_SIZE*BOARD_SIZE-1]
+
+	if !isSolvable(board) {
+		board[BOARD_SIZE*BOARD_SIZE-BOARD_SIZE] = board[BOARD_SIZE*BOARD_SIZE-BOARD_SIZE] ^ board[BOARD_SIZE*BOARD_SIZE-BOARD_SIZE-1]
+		board[BOARD_SIZE*BOARD_SIZE-BOARD_SIZE-1] = board[BOARD_SIZE*BOARD_SIZE-BOARD_SIZE] ^ board[BOARD_SIZE*BOARD_SIZE-BOARD_SIZE-1]
+		board[BOARD_SIZE*BOARD_SIZE-BOARD_SIZE] = board[BOARD_SIZE*BOARD_SIZE-BOARD_SIZE] ^ board[BOARD_SIZE*BOARD_SIZE-BOARD_SIZE-1]
+	}
+
 	return board
 }
 
 func main() {
 	board := board_create()
 	//board := [BOARD_SIZE * BOARD_SIZE]int8{7, 13, 11, 5, 14, 1, 15, 12, 6, 9, 4, 8, 10, 3, 2}
-	Solver(board)
+	HEURISTIC = 0
+	Solver(false, board)
+	HEURISTIC = 1
+	Solver(false, board)
 
 }
