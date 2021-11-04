@@ -383,7 +383,7 @@ func board_create() [BOARD_SIZE * BOARD_SIZE]int8 {
 	board[len(board)-1] = 0
 	board = shuffle(board)
 
-	//printBoard(board)
+	printBoard(board)
 	return board
 }
 
@@ -453,8 +453,8 @@ func main() {
 	board := board_create()
 	//board := [BOARD_SIZE * BOARD_SIZE]int8{7, 13, 11, 5, 14, 1, 15, 12, 6, 9, 4, 8, 10, 3, 2}
 	HEURISTIC = 0
-	Solver(false, board)
-	HEURISTIC = 1
-	Solver(false, board)
+	Solver(true, board)
+	//HEURISTIC = 1
+	//Solver(false, board)
 
 }
